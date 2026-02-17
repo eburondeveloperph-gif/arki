@@ -19,21 +19,33 @@ export interface Wall {
   id: string;
   start: Point;
   end: Point;
-  thickness: number; // in logical units (e.g., cm)
+  thickness: number; // in logical units (cm)
+  name?: string;
 }
 
 export interface Opening {
   id: string;
   type: 'door' | 'window';
   wallId: string;
-  offset: number; // 0 to 1 (normalized position along wall)
-  width: number; // width in logical units
+  offset: number; // 0 to 1
+  width: number;
+  subType?: string; // e.g., "sliding", "swing", "fixed"
+}
+
+export interface Fixture {
+  id: string;
+  type: 'toilet' | 'sink' | 'shower' | 'bed' | 'sofa' | 'table';
+  pos: Point;
+  rotation: number;
+  width: number;
+  depth: number;
 }
 
 export interface FloorPlan {
   id: string;
   walls: Wall[];
   openings: Opening[];
+  fixtures: Fixture[];
   name?: string;
   timestamp: number;
 }
@@ -43,9 +55,8 @@ export interface ApiError {
   details?: string;
 }
 
-export type ToolType = 'select' | 'wall' | 'door' | 'window' | 'measure';
+export type ToolType = 'select' | 'wall' | 'door' | 'window' | 'fixture' | 'measure';
 
-// Added GeneratedSvg interface to fix import error in SvgPreview.tsx
 export interface GeneratedSvg {
   id: string;
   content: string;

@@ -8,17 +8,21 @@ import { Header } from './components/Header';
 import { InputSection } from './components/InputSection';
 import { EditorCanvas } from './components/EditorCanvas';
 import { Toolbar } from './components/Toolbar';
+import { Sidebar } from './components/Sidebar';
 import { generateFloorPlan } from './services/geminiService';
 import { FloorPlan, GenerationStatus, ApiError, ToolType } from './types';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, PanelRightOpen } from 'lucide-react';
 
 const App: React.FC = () => {
   const [status, setStatus] = useState<GenerationStatus>(GenerationStatus.IDLE);
   const [activeTool, setActiveTool] = useState<ToolType>('wall');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showSidebar, setShowSidebar] = useState(true);
   const [plan, setPlan] = useState<FloorPlan>({
     id: 'default',
     walls: [],
     openings: [],
+    fixtures: [],
     timestamp: Date.now()
   });
   const [error, setError] = useState<ApiError | null>(null);
@@ -29,7 +33,8 @@ const App: React.FC = () => {
 
     try {
       const generatedPlan = await generateFloorPlan(prompt);
-      setPlan(generatedPlan);
+      // Ensure fixtures array exists from API
+      setPlan({ ...generatedPlan, fixtures: generatedPlan.fixtures || [] });
       setStatus(GenerationStatus.SUCCESS);
     } catch (err: any) {
       setStatus(GenerationStatus.ERROR);
@@ -37,13 +42,11 @@ const App: React.FC = () => {
         message: "Architect Generation Failed",
         details: err.message || "An unexpected error occurred while contacting the architect service."
       });
-      // Reset after error so user can continue editing manual
       setTimeout(() => setStatus(GenerationStatus.IDLE), 5000);
     }
   };
 
   const handleExport = () => {
-     // Simple SVG export by grabbing the inner HTML of the canvas
      const svgEl = document.querySelector('svg');
      if (!svgEl) return;
      const serializer = new XMLSerializer();
@@ -62,29 +65,57 @@ const App: React.FC = () => {
     <div className="h-screen bg-zinc-950 text-zinc-100 font-sans flex flex-col overflow-hidden">      
       <Header />
       
-      <main className="flex-1 relative flex">
+      <main className="flex-1 relative flex overflow-hidden">
         <Toolbar 
           activeTool={activeTool} 
-          onToolChange={setActiveTool} 
-          onClear={() => setPlan({ ...plan, walls: [], openings: [] })}
+          onToolChange={(tool) => {
+            setActiveTool(tool);
+            if (tool !== 'select') setSelectedId(null);
+          }} 
+          onClear={() => {
+            if (confirm("Are you sure you want to clear the entire project?")) {
+              setPlan({ ...plan, walls: [], openings: [], fixtures: [] });
+              setSelectedId(null);
+            }
+          }}
           onExport={handleExport}
-          hasItems={plan.walls.length > 0}
+          hasItems={plan.walls.length > 0 || plan.fixtures.length > 0}
         />
 
         <EditorCanvas 
           plan={plan}
           activeTool={activeTool}
           onUpdatePlan={setPlan}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
         />
+
+        {!showSidebar && (
+          <button 
+            onClick={() => setShowSidebar(true)}
+            className="absolute top-4 right-4 p-2 bg-zinc-900 border border-white/10 rounded-lg text-zinc-400 hover:text-white transition-all z-40"
+          >
+            <PanelRightOpen className="w-5 h-5" />
+          </button>
+        )}
+
+        {showSidebar && (
+          <Sidebar 
+            plan={plan} 
+            selectedId={selectedId} 
+            onUpdatePlan={setPlan}
+            onClose={() => setShowSidebar(false)}
+          />
+        )}
 
         <InputSection onGenerate={handleGenerate} status={status} />
         
         {status === GenerationStatus.ERROR && error && (
           <div className="absolute top-4 right-4 max-w-sm z-50 animate-fade-in">
-            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3 text-red-200 backdrop-blur-md">
+            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3 text-red-200 backdrop-blur-md shadow-2xl">
               <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
               <div>
-                <h4 className="font-semibold text-red-400">{error.message}</h4>
+                <h4 className="font-semibold text-red-400 uppercase tracking-widest text-[10px]">Error</h4>
                 <p className="text-xs text-red-300/70 mt-1">{error.details}</p>
               </div>
             </div>
